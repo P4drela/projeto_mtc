@@ -19,7 +19,7 @@ Users can vote **positive** 👍 or **negative** 👎 on a project. The vote cou
 ### 1. Clone the repository
 
 ```sh
-git clone https://github.com/YOUR_USERNAME/voting-app.git
+git clone https://github.com/P4drela/projeto_mtc.git
 cd projeto_mtc
 ```
 
