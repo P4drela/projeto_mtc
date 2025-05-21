@@ -7,13 +7,13 @@ function App() {
 
   return (
     <>
-    <body className=' bg-gradient-to-r from-blue-600 to-violet-600'>
-
+    
+   <body className='font-Jet bg-gradient-to-r from-blue-600 to-violet-600'>
        <div className="min-h-screen  flex items-center justify-center">
       <VoteCard />
       </div>
-      
       </body>
+      
     </>
   )
 }
