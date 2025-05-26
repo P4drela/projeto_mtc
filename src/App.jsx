@@ -1,19 +1,32 @@
 import { useState } from 'react'
 import VoteCard from './components/VoteCard'
+import AdminPanel from './components/AdminPanel'
 import './App.css'
 
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [view, setView] = useState('vote')
 
   return (
-    <>
-    <body className=' bg-gradient-to-r from-blue-600 to-violet-600'>
 
-       <div className="min-h-screen  flex items-center justify-center">
-      <VoteCard />
+    <>
+    
+   
+       
+      <div className="min-h-screen p-4">
+      <div className="flex gap-4 mb-80">
+        <button onClick={() =>  setView('vote')} className="bg-blue-500 text-white px-4 py-2 rounded-xl">
+          Vote View
+        </button>
+        <button onClick={() => setView('admin')} className="bg-gray-800 text-white px-4 py-2 rounded-xl">
+          Admin View
+        </button>
       </div>
-      
-      </body>
+
+      {view === 'vote' ? <VoteCard /> : <AdminPanel />}
+    </div>
+
+    
     </>
   )
 }
