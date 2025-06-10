@@ -2,13 +2,15 @@ import { useState } from 'react'
 import VoteCard from './components/VoteCard'
 import AdminPanel from './components/AdminPanel'
 import './App.css'
+import { CookiesProvider } from 'react-cookie'
+import LoginForm from './components/login'
 
 
 function App() {
   const [view, setView] = useState('vote')
 
   return (
-
+  <CookiesProvider>
     <>
     
    
@@ -23,11 +25,14 @@ function App() {
         </button>
       </div>
 
-      {view === 'vote' ? <VoteCard /> : <AdminPanel />}
+      
+
+      {view === 'vote' ? <VoteCard /> : <LoginForm />}
     </div>
 
     
     </>
+  </CookiesProvider>
   )
 }
 
