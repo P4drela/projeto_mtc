@@ -47,7 +47,7 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="max-w-xl mx-auto mt-10 bg-gray-100 p-6 rounded-xl shadow-2xl">
+    <div className="max-w-xl mx-auto mt-10bg-gray-100 p-6 rounded-xl shadow-2xl">
       <h2 className="text-2xl font-bold mb-4 text-center">Admin Panel</h2>
 
       <div className="mb-4">

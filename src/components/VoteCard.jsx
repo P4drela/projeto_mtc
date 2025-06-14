@@ -6,7 +6,7 @@ export default function VoteCard() {
   const [project, setProject] = useState(null)
   const [questions, setQuestions] = useState([])
   const [cookies, setCookie] = useCookies(['votes'])
-  const projectName = 'Teste'
+  const projectName = 'Projeto 2'
   const POLL_INTERVAL = 2000 
 
   
@@ -15,7 +15,7 @@ export default function VoteCard() {
 
     const fetchData = async () => {
       try {
-        // Fetch project
+        
         const { data: projectData, error: projectError } = await supabase
           .from('projects')
           .select('*, status_projs(*)')

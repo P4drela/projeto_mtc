@@ -16,7 +16,7 @@ function App() {
    
        
       <div className="min-h-screen p-4">
-      <div className="flex gap-4 mb-80">
+      <div className="flex gap-4 mb-20">
         <button onClick={() =>  setView('vote')} className="bg-blue-500 text-white px-4 py-2 rounded-xl">
           Vote View
         </button>
