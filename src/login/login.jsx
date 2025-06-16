@@ -1,29 +1,31 @@
-import { useState } from 'react'
-import { supabase } from '../supabaseClient.js'
+import { useState } from 'react';
+import { supabase } from '../supabaseClient.js';
+import { useNavigate } from 'react-router-dom';
 
 function LoginForm() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+    e.preventDefault();
+    setLoading(true);
+    setError('');
 
     const { data, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password
-    })
+    });
 
     if (authError) {
-      setError(authError.message)
-      setLoading(false)
+      setError(authError.message);
+      setLoading(false);
     } else {
-      window.location.href = '/admin-dashboard'
+      navigate('/admin-dashboard');
     }
-  }
+  };
 
   return (
     <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -97,7 +99,7 @@ function LoginForm() {
         </form>
       </div>
     </div>
-  )
+  );
 }
 
-export default LoginForm
+export default LoginForm;

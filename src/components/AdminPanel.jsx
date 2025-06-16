@@ -31,10 +31,10 @@ export default function AdminPanel() {
     setLoading(true)
     setMessage('')
 
-    const { error } = await supabase.rpc('set_project_status_by_name', {
-      target_title: selectedProject,
-      new_status: selectedStatus,
-    })
+    const { error } = await supabase
+      .from('projects')
+      .update({ ref_id_status_projs: selectedStatus }) 
+      .eq('title', selectedProject)
 
     if (error) {
       console.error('Status update error:', error)
@@ -46,8 +46,29 @@ export default function AdminPanel() {
     setLoading(false)
   }
 
+  const handleSetActiveProject = async () => {
+    if (!selectedProject) return
+
+    setLoading(true)
+    setMessage('')
+
+    const { error } = await supabase
+      .from('active_project')
+      .update({ project_title: selectedProject })
+      .eq('id', 1)
+
+    if (error) {
+      console.error('Failed to set active project:', error)
+      setMessage('❌ Failed to set active project')
+    } else {
+      setMessage('✅ Active project updated')
+    }
+
+    setLoading(false)
+  }
+
   return (
-    <div className="max-w-xl mx-auto mt-10bg-gray-100 p-6 rounded-xl shadow-2xl">
+    <div className="max-w-xl mx-auto mt-10 bg-gray-100 p-6 rounded-xl shadow-2xl">
       <h2 className="text-2xl font-bold mb-4 text-center">Admin Panel</h2>
 
       <div className="mb-4">
@@ -75,7 +96,7 @@ export default function AdminPanel() {
         >
           <option value="">-- Choose status --</option>
           {statuses.map((s) => (
-            <option key={s.id_status_projs} value={s.status_projs}>
+            <option key={s.id_status_projs} value={s.id_status_projs}>
               {s.status_projs}
             </option>
           ))}
@@ -85,9 +106,17 @@ export default function AdminPanel() {
       <button
         onClick={handleChangeStatus}
         disabled={loading || !selectedProject || !selectedStatus}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded"
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded cursor-pointer"
       >
         {loading ? 'Updating...' : 'Update Status'}
+      </button>
+
+      <button
+        onClick={handleSetActiveProject}
+        disabled={loading || !selectedProject}
+        className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded mt-2 cursor-pointer"
+      >
+        {loading ? 'Setting...' : 'Set as Active Project'}
       </button>
 
       {message && <p className="text-center mt-4">{message}</p>}
