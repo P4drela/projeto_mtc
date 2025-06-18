@@ -1,125 +1,110 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 
-export default function AdminPanel() {
+export default function AdminDashboard() {
   const [projects, setProjects] = useState([])
-  const [statuses, setStatuses] = useState([])
-  const [selectedProject, setSelectedProject] = useState('')
-  const [selectedStatus, setSelectedStatus] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const { data: projData, error: projError } = await supabase.from('projects').select('title')
-      const { data: statusData, error: statusError } = await supabase.from('status_projs').select('*')
-
-      if (projError || statusError) {
-        console.error(projError || statusError)
-      } else {
-        setProjects(projData)
-        setStatuses(statusData)
-      }
-    }
-
-    fetchData()
-  }, [])
-
-  const handleChangeStatus = async () => {
-    if (!selectedProject || !selectedStatus) return
-
-    setLoading(true)
-    setMessage('')
-
-    const { error } = await supabase
-      .from('projects')
-      .update({ ref_id_status_projs: selectedStatus }) 
-      .eq('title', selectedProject)
-
-    if (error) {
-      console.error('Status update error:', error)
-      setMessage('❌ Failed to update status')
-    } else {
-      setMessage('✅ Status updated successfully')
-    }
-
-    setLoading(false)
+  const statusMap = {
+    0: 'APRESENTAÇÃO',
+    1: 'VOTAÇÃO',
+    2: 'TERMINADO',
   }
 
-  const handleSetActiveProject = async () => {
-    if (!selectedProject) return
+  useEffect(() => {
+    const fetchProjects = async () => {
+      const { data } = await supabase
+        .from('projects')
+        .select('id_projects, title, ref_id_status_projs')
+        .order('id_projects', { ascending: true })
+      if (data) setProjects(data)
+    }
 
+    fetchProjects()
+  }, [])
+
+  const handleRadioChange = async (project, statusId) => {
     setLoading(true)
     setMessage('')
 
-    const { error } = await supabase
+    
+    const { error: statusError } = await supabase
+      .from('projects')
+      .update({ ref_id_status_projs: statusId })
+      .eq('id_projects', project.id_projects)
+
+    
+    const { error: activeError } = await supabase
       .from('active_project')
-      .update({ project_title: selectedProject })
+      .update({ project_title: project.title })
       .eq('id', 1)
 
-    if (error) {
-      console.error('Failed to set active project:', error)
-      setMessage('❌ Failed to set active project')
+    if (statusError || activeError) {
+      setMessage('❌ Failed to update project or set active project.')
+      console.error(statusError || activeError)
     } else {
-      setMessage('✅ Active project updated')
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.id_projects === project.id_projects
+            ? { ...p, ref_id_status_projs: statusId }
+            : p
+        )
+      )
+      setMessage('✅ Status and active project updated.')
     }
 
     setLoading(false)
   }
 
   return (
-    <div className="max-w-xl mx-auto mt-10 bg-gray-100 p-6 rounded-xl shadow-2xl">
-      <h2 className="text-2xl font-bold mb-4 text-center">Admin Panel</h2>
+    <div className="max-w-4xl mx-auto mt-10 p-6 bg-[#fdf5f5] rounded-xl shadow-xl">
+      <h1 className="text-2xl font-bold text-center mb-4">Dashboard Geral - Votações</h1>
+      <p className="text-sm text-center text-gray-500 mb-6">
+        Última atualização: {new Date().toLocaleString('pt-PT')}
+      </p>
 
-      <div className="mb-4">
-        <label className="block mb-1 font-semibold">Select Project</label>
-        <select
-          className="w-full p-2 rounded border"
-          value={selectedProject}
-          onChange={(e) => setSelectedProject(e.target.value)}
-        >
-          <option value="">-- Choose a project --</option>
-          {projects.map((proj) => (
-            <option key={proj.title} value={proj.title}>
-              {proj.title}
-            </option>
-          ))}
-        </select>
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-white rounded shadow">
+          <thead className="bg-gray-200 text-gray-700">
+            <tr>
+              <th className="px-4 py-2 text-left">PROJETOS</th>
+              {Object.values(statusMap).map((label) => (
+                <th key={label} className="px-4 py-2 text-center">
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {projects.map((project, index) => (
+              <tr key={project.id_projects} className="border-t hover:bg-gray-50">
+                <td className="px-4 py-3 font-medium text-gray-800">
+                  #{String(index + 1).padStart(2, '0')} {project.title}
+                </td>
+                {Object.entries(statusMap).map(([statusId, _]) => (
+                  <td key={statusId} className="text-center px-4 py-2">
+                    <input
+                      type="radio"
+                      name={`status-${project.id_projects}`}
+                      checked={project.ref_id_status_projs === Number(statusId)}
+                      onChange={() => handleRadioChange(project, Number(statusId))}
+                      disabled={loading}
+                      className="w-4 h-4 accent-blue-600 cursor-pointer"
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      <div className="mb-4">
-        <label className="block mb-1 font-semibold">Set Status</label>
-        <select
-          className="w-full p-2 rounded border"
-          value={selectedStatus}
-          onChange={(e) => setSelectedStatus(e.target.value)}
-        >
-          <option value="">-- Choose status --</option>
-          {statuses.map((s) => (
-            <option key={s.id_status_projs} value={s.id_status_projs}>
-              {s.status_projs}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <button
-        onClick={handleChangeStatus}
-        disabled={loading || !selectedProject || !selectedStatus}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded cursor-pointer"
-      >
-        {loading ? 'Updating...' : 'Update Status'}
-      </button>
-
-      <button
-        onClick={handleSetActiveProject}
-        disabled={loading || !selectedProject}
-        className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded mt-2 cursor-pointer"
-      >
-        {loading ? 'Setting...' : 'Set as Active Project'}
-      </button>
-
-      {message && <p className="text-center mt-4">{message}</p>}
+      {message && (
+        <p className="mt-4 text-center text-sm font-semibold text-blue-600">
+          {message}
+        </p>
+      )}
     </div>
   )
 }
