@@ -1,198 +1,220 @@
-import { useEffect, useRef, useState } from 'react'
-import { supabase } from '../supabaseClient'
-import { useCookies } from 'react-cookie'
+import { useEffect, useRef, useState } from 'react';
+import { supabase } from '../supabaseClient';
+import { useCookies } from 'react-cookie';
+import logo from '../assets/logo.png';
 
 export default function VoteCard() {
-  const [project, setProject] = useState(null)
-  const [questions, setQuestions] = useState([])
-  const [cookies, setCookie] = useCookies(['votes'])
+  const [project, setProject] = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [cookies, setCookie] = useCookies(['votes']);
+  const [selectedVotes, setSelectedVotes] = useState({});
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [votingAllowed, setVotingAllowed] = useState(true);
+  const timerRef = useRef(null);
 
-  const currentTitleRef = useRef(null)
-  const currentStatusRef = useRef(null)
+  const fetchData = async () => {
+    const { data: activeData } = await supabase
+      .from('active_project')
+      .select('project_title')
+      .eq('id', 1)
+      .single();
+
+    const activeTitle = activeData?.project_title;
+    if (!activeTitle) return;
+
+    const { data: projectData } = await supabase
+      .from('projects')
+      .select('*, status_projs(*)')
+      .eq('title', activeTitle)
+      .single();
+
+    const { data: questionsData } = await supabase
+      .from('proj_has_questions')
+      .select('*, questions(*)')
+      .eq('ref_id_projects', projectData.id_projects)
+      .order('ref_id_questions');
+
+    setProject(projectData);
+    setQuestions(questionsData || []);
+  };
 
   useEffect(() => {
-    let interval
+    fetchData();
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
-    const fetchData = async () => {
-      try {
+  useEffect(() => {
+    if (project?.status_projs?.status_projs === 'Voting') {
+      const projectKey = `vote_timer_${project.id_projects}`;
+      const storedStart = localStorage.getItem(projectKey);
 
-        const { data: activeData, error: activeError } = await supabase
-          .from('active_project')
-          .select('project_title')
-          .eq('id', 1)
-          .single()
+      let startTime = storedStart ? parseInt(storedStart) : Date.now();
+      if (!storedStart) localStorage.setItem(projectKey, startTime.toString());
 
-        if (activeError) throw activeError
-        const activeTitle = activeData?.project_title
-        if (!activeTitle) return
+      const updateCountdown = () => {
+        const now = Date.now();
+        const secondsElapsed = Math.floor((now - startTime) / 1000);
+        const remaining = 30 - secondsElapsed;
 
-        let shouldUpdateProject = false
-        if (activeTitle !== currentTitleRef.current) {
-          currentTitleRef.current = activeTitle
-          shouldUpdateProject = true
-        }
-
-        const { data: projectData, error: projectError } = await supabase
-          .from('projects')
-          .select('*, status_projs(*)')
-          .eq('title', activeTitle)
-          .single()
-
-        if (projectError) throw projectError
-
-        const currentStatus = projectData.status_projs?.id_status_projs
-        const projectChanged =
-          shouldUpdateProject || currentStatus !== currentStatusRef.current
-
-        if (projectChanged || !project) {
-          setProject(projectData)
-          currentStatusRef.current = currentStatus
-
-          const { data: questionsData, error: questionsError } = await supabase
-            .from('proj_has_questions')
-            .select('*, questions(*)')
-            .eq('ref_id_projects', projectData.id_projects)
-            .order('ref_id_questions', { ascending: true })
-
-          if (questionsError) throw questionsError
-          setQuestions(questionsData || [])
+        if (remaining <= 0) {
+          setTimeLeft(0);
+          setVotingAllowed(false);
+          clearInterval(timerRef.current);
         } else {
-
-          const { data: updatedVotes, error: votesError } = await supabase
-            .from('proj_has_questions')
-            .select('ref_id_questions, votes_a, votes_b')
-            .eq('ref_id_projects', project.id_projects)
-
-          if (votesError) throw votesError
-
-          setQuestions((prev) =>
-            prev.map((q) => {
-              const updated = updatedVotes.find(
-                (u) => u.ref_id_questions === q.ref_id_questions
-              )
-              return updated
-                ? { ...q, votes_a: updated.votes_a, votes_b: updated.votes_b }
-                : q
-            })
-          )
+          setTimeLeft(remaining);
         }
-      } catch (err) {
-        console.error('Polling error:', err)
-      }
+      };
+
+      updateCountdown();
+      timerRef.current = setInterval(updateCountdown, 1000);
+      return () => clearInterval(timerRef.current);
     }
+  }, [project]);
 
-    fetchData()
-    interval = setInterval(fetchData, 5000)
+  const hasVoted = (questionId) =>
+    cookies.votes?.[`project_${project.id_projects}_question_${questionId}`];
 
-    return () => clearInterval(interval)
-  }, [project])
+  const handleOptionSelect = (questionId, option) => {
+    if (!votingAllowed || hasVoted(questionId)) return;
+    setSelectedVotes((prev) => ({ ...prev, [questionId]: option }));
+  };
 
-  function hasVoted(questionId) {
-    return cookies.votes?.[`project_${project?.id_projects}_question_${questionId}`]
-  }
+  const handleSubmitVotes = async () => {
+    const entries = Object.entries(selectedVotes);
+    if (!entries.length) return;
 
-  async function handleVote(questionId, voteType) {
-    if (hasVoted(questionId)) {
-      alert('You have already voted on this question!')
-      return
-    }
+    const newVotes = { ...(cookies.votes || {}) };
 
-    try {
-      const { error } = await supabase.rpc('vote_on_question', {
-        project_id: project.id_projects,
-        question_id: questionId,
-        vote_type: voteType,
+    await Promise.all(
+      entries.map(async ([questionId, voteType]) => {
+        const cookieKey = `project_${project.id_projects}_question_${questionId}`;
+        if (!newVotes[cookieKey]) {
+          await supabase.rpc('vote_on_question', {
+            project_id: project.id_projects,
+            question_id: parseInt(questionId),
+            vote_type: voteType === 'Sim' ? 'positive' : 'negative',
+          });
+          newVotes[cookieKey] = true;
+        }
       })
+    );
 
-      if (error) throw error
+    setCookie('votes', newVotes, { path: '/', maxAge: 60 * 60 * 24 * 365 });
+    setSelectedVotes({});
+  };
 
-      const newVotes = { ...(cookies.votes || {}) }
-      newVotes[`project_${project.id_projects}_question_${questionId}`] = true
-      setCookie('votes', newVotes, {
-        path: '/',
-        maxAge: 60 * 60 * 24 * 365,
-        sameSite: 'strict',
-      })
+  if (!project) return <div className="p-10 text-center text-gray-600">Loading...</div>;
 
-      setQuestions((prev) =>
-        prev.map((q) =>
-          q.ref_id_questions === questionId
-            ? {
-                ...q,
-                votes_a: voteType === 'positive' ? q.votes_a + 1 : q.votes_a,
-                votes_b: voteType === 'negative' ? q.votes_b + 1 : q.votes_b,
-              }
-            : q
-        )
-      )
-    } catch (error) {
-      console.error('Vote failed:', error)
-      alert('Vote failed. Please try again.')
-    }
-  }
+  const status = project.status_projs?.status_projs;
+  const logoUrl = '/logo.png';
 
-  if (!project) {
-    return (
-      <div className="rounded-xl shadow-2xl m-auto h-20 w-60 bg-amber-50 text-center">
-        <p className="p-7 font-bold">Loading...</p>
+  const renderPresenting = () => (
+    <div className="max-w-md mx-auto bg-white shadow-xl rounded-xl p-6 text-center space-y-4">
+      <div className="flex justify-between items-center">
+        <div className="text-left">
+          <p className="text-sm text-gray-500">#{project.id_projects}</p>
+          <h2 className="text-xl font-bold text-blue-800">{project.title}</h2>
+          <p className="text-sm text-gray-700 whitespace-pre-line">{project.text}</p>
+        </div>
+        <img src={logo} alt="Logo" className="w-24 h-20 object-contain" />
       </div>
-    )
-  }
+      <img
+        src={project.image_url || '/placeholder.png'}
+        alt="Project"
+        className="w-full h-48 object-cover rounded-md"
+      />
 
-  const isPresenting = project.status_projs?.status_projs === 'Presenting'
-  const votingDisabled = ['Presenting', 'Voting Closed'].includes(
-    project.status_projs?.status_projs
-  )
+    </div>
+  );
+
+  const renderVoting = () => (
+    <div className="max-w-md mx-auto bg-white shadow-xl rounded-xl p-6 text-center space-y-5">
+      <div>
+        <p className="text-sm text-gray-500">#{project.id_projects}</p>
+        <h2 className="text-xl font-bold text-blue-800">{project.title}</h2>
+      </div>
+      {questions.map((q) => {
+        const qid = q.ref_id_questions;
+        return (
+          <div key={qid} className="space-y-2">
+            <p className="text-sm text-gray-800">{q.questions?.text}</p>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={() => handleOptionSelect(qid, 'Sim')}
+                disabled={hasVoted(qid) || !votingAllowed}
+                className={`px-4 py-2 rounded-full font-medium text-white ${
+                  selectedVotes[qid] === 'Sim'
+                    ? 'bg-blue-700'
+                    : hasVoted(qid)
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-gray-300 hover:bg-blue-100 text-gray-800'
+                }`}
+              >
+                SIM
+              </button>
+              <button
+                onClick={() => handleOptionSelect(qid, 'Nao')}
+                disabled={hasVoted(qid) || !votingAllowed}
+                className={`px-4 py-2 rounded-full font-medium text-white ${
+                  selectedVotes[qid] === 'Nao'
+                    ? 'bg-blue-700'
+                    : hasVoted(qid)
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-gray-300 hover:bg-blue-100 text-gray-800'
+                }`}
+              >
+                NÃO
+              </button>
+            </div>
+          </div>
+        );
+      })}
+      <button
+        onClick={handleSubmitVotes}
+        disabled={!votingAllowed || Object.keys(selectedVotes).length === 0}
+        className="mt-2 bg-blue-800 text-white font-bold px-6 py-2 rounded-lg disabled:bg-gray-400"
+      >
+        SUBMETER VOTO
+      </button>
+      <p className="text-sm text-gray-600">
+        TEMPO RESTANTE <span className="font-bold">{String(timeLeft).padStart(2, '0')}s</span>
+      </p>
+    </div>
+  );
+
+  const renderVotingClosed = () => (
+    <div className="max-w-md mx-auto bg-white shadow-xl rounded-xl p-6 text-center space-y-5">
+      <div>
+        <p className="text-sm text-gray-500">#{project.number}</p>
+        <h2 className="text-xl font-bold text-blue-800">{project.title}</h2>
+      </div>
+      {questions.map((q) => {
+        const total = q.votes_a + q.votes_b;
+        const percentA = total ? Math.round((q.votes_a / total) * 100) : 0;
+        const percentB = 100 - percentA;
+        return (
+          <div key={q.ref_id_questions} className="space-y-1 text-left">
+            <p className="text-sm font-medium text-gray-800 italic">• {q.questions?.text}</p>
+            <div className="flex gap-2">
+              <div className="flex-1 bg-green-500 text-white text-center rounded-full py-1 font-semibold text-sm">
+                {percentA}%
+              </div>
+              <div className="flex-1 bg-red-500 text-white text-center rounded-full py-1 font-semibold text-sm">
+                {percentB}%
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 
   return (
-    <div className="max-w-md mx-auto mt-10 bg-white p-6 rounded-2xl shadow-lg text-center z-50">
-      <h2 className="text-2xl font-bold mb-2">{project.title}</h2>
-      <p className="text-sm text-gray-500 mb-4">
-        Status: <strong>{project.status_projs?.status_projs || 'Unknown'}</strong>
-      </p>
-
-      {!isPresenting && (
-        <div className="space-y-6">
-          {questions.map((question) => (
-            <div
-              key={question.ref_id_questions}
-              className="border-b pb-4 last:border-b-0"
-            >
-              <p className="mb-3 font-medium">{question.questions?.text}</p>
-
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-green-600 font-bold">
-                  👍 {question.votes_a || 0}
-                </span>
-                <span className="text-red-600 font-bold">
-                  👎 {question.votes_b || 0}
-                </span>
-              </div>
-
-              {votingDisabled ? (
-                <p className="text-xs text-gray-500 mt-2 italic">Voting closed.</p>
-              ) : !hasVoted(question.ref_id_questions) ? (
-                <div className="flex justify-center gap-4">
-                  <button
-                    onClick={() => handleVote(question.ref_id_questions, 'positive')}
-                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors cursor-pointer"
-                  >
-                    Vote A
-                  </button>
-                  <button
-                    onClick={() => handleVote(question.ref_id_questions, 'negative')}
-                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors cursor-pointer"
-                  >
-                    Vote B
-                  </button>
-                </div>
-              ) : (
-                <p className="text-xs text-gray-500 mt-2">✓ Vote submitted</p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
+    <>
+      {status === 'Presenting' && renderPresenting()}
+      {status === 'Voting' && renderVoting()}
+      {status === 'Voting Closed' && renderVotingClosed()}
+    </>
+  );
 }

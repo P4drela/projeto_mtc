@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { FiLogOut } from 'react-icons/fi';
+import logo from '../assets/logo.png';
 
 export default function AdminDashboard() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [user, setUser] = useState(null);
+  const [selectedStatus, setSelectedStatus] = useState(null); 
   const navigate = useNavigate();
 
   const statusMap = {
@@ -14,7 +17,6 @@ export default function AdminDashboard() {
     1: 'VOTAÇÃO',
     2: 'TERMINADO',
   };
-
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -58,7 +60,7 @@ export default function AdminDashboard() {
       .eq('id', 1);
 
     if (statusError || activeError) {
-      setMessage('❌ Failed to update project or set active project.');
+      setMessage('❌ Falha ao atualizar projeto e status.');
       console.error(statusError || activeError);
     } else {
       setProjects((prev) =>
@@ -68,13 +70,14 @@ export default function AdminDashboard() {
             : p
         )
       );
-      setMessage('✅ Status and active project updated.');
+      setMessage('✅ Status e projeto ativo atualizados.');
     }
 
     setLoading(false);
   };
 
   const handleStatusAppChange = async (status) => {
+    setSelectedStatus(status); 
     const { error } = await supabase
       .from('status_app')
       .update({ status_app: status })
@@ -82,7 +85,7 @@ export default function AdminDashboard() {
 
     if (error) {
       console.error('Failed to update app status:', error);
-      setMessage('❌ Falha ao atualizar o status do app');
+      setMessage('❌ Falha ao atualizar o status da app');
     } else {
       setMessage(`✅ App status atualizado para "${status}"`);
     }
@@ -95,22 +98,29 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="absolute top-4 left-4 flex gap-2">
-        <button
+      
+      <header className="bg-blue-950 shadow-sm py-4 px-6 flex justify-between items-center">
+        
+        <div 
           onClick={() => navigate('/')}
-          className="bg-blue-400 hover:bg-blue-500 text-white px-4 py-2 rounded-xl shadow-xl cursor-pointer"
+          className="flex items-center cursor-pointer"
         >
-          Back to Main
-        </button>
+          <div className="rounded-md mb- mr-2">
+            <img src={logo} alt="DigiMedia logo" className="w-24 p-0" title="Main"/>
+          </div>
+          <h1 className="text-xl font-semibold text-white">students</h1><h1 className="text-xl font-semibold text-blue-300">@DigiMedia</h1>
+        </div>
+        
         <button
           onClick={handleLogout}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl shadow-xl cursor-pointer"
+          className="cursor-pointer p-2 rounded-full hover:bg-gray-100 transition-colors"
+          title="Logout"
         >
-          Logout
+          <FiLogOut className="w-10 h-10 text-orange-400" />
         </button>
-      </div>
+      </header>
 
-      <div className="max-w-4xl mx-auto mt-24 p-6 bg-[#fdf5f5] rounded-xl shadow-xl">
+      <div className="max-w-4xl mx-auto mt-8 p-6 bg-[#fdf5f5] rounded-xl shadow-xl">
         <h1 className="text-2xl font-bold text-center mb-2">Dashboard Geral - Votações</h1>
         <p className="text-sm text-center text-gray-500 mb-6">
           Última atualização: {new Date().toLocaleString('pt-PT')}
@@ -121,12 +131,14 @@ export default function AdminDashboard() {
             <button
               key={label}
               onClick={() => handleStatusAppChange(label)}
-              className={`px-6 py-2 rounded-xl shadow-xl cursor-pointer font-semibold ${
-                label === 'ANTES'
-                  ? 'bg-blue-700 text-white'
-                  : label === 'DURANTE'
-                  ? 'bg-yellow-500 text-white'
-                  : 'bg-green-600 text-white'
+              className={`px-6 py-2 rounded-xs shadow-xl cursor-pointer font-semibold ${
+                selectedStatus === label
+                  ? label === 'ANTES'
+                    ? 'bg-blue-950 text-white'
+                    : label === 'DURANTE'
+                    ? 'bg-blue-950 text-white'
+                    : 'bg-blue-950 text-white'
+                  : 'bg-white text-black'
               } hover:opacity-90 transition-all`}
             >
               {label}
@@ -160,7 +172,7 @@ export default function AdminDashboard() {
                         checked={project.ref_id_status_projs === Number(statusId)}
                         onChange={() => handleRadioChange(project, Number(statusId))}
                         disabled={loading}
-                        className="w-4 h-4 accent-blue-600 cursor-pointer"
+                        className="w-4 h-4 accent-blue-950 cursor-pointer"
                       />
                     </td>
                   ))}
@@ -171,7 +183,7 @@ export default function AdminDashboard() {
         </div>
 
         {message && (
-          <p className="mt-4 text-center text-sm font-semibold text-blue-600">
+          <p className="mt-4 text-center text-sm font-semibold text-blue-950">
             {message}
           </p>
         )}
