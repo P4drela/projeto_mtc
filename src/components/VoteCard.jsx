@@ -15,7 +15,7 @@ export default function VoteCard() {
 
     const fetchData = async () => {
       try {
-        // 1. Get active project title
+
         const { data: activeData, error: activeError } = await supabase
           .from('active_project')
           .select('project_title')
@@ -32,7 +32,6 @@ export default function VoteCard() {
           shouldUpdateProject = true
         }
 
-        // 2. Fetch full project + status
         const { data: projectData, error: projectError } = await supabase
           .from('projects')
           .select('*, status_projs(*)')
@@ -58,7 +57,7 @@ export default function VoteCard() {
           if (questionsError) throw questionsError
           setQuestions(questionsData || [])
         } else {
-          // 3. Only poll for updated vote counts
+
           const { data: updatedVotes, error: votesError } = await supabase
             .from('proj_has_questions')
             .select('ref_id_questions, votes_a, votes_b')

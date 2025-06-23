@@ -1,11 +1,13 @@
+// App.jsx
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import VoteCard from './components/VoteCard';
 import AdminPanel from './components/AdminPanel';
-import './App.css';
-import { CookiesProvider } from 'react-cookie';
 import LoginForm from './login/login';
+import BeforeView from './components/BeforeView';
 import { supabase } from './supabaseClient';
+import { CookiesProvider } from 'react-cookie';
+import AfterView from './components/AfterView';
 
 function Home() {
   const [view, setView] = useState('vote');
@@ -17,6 +19,7 @@ function Home() {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
     };
+
     checkUser();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -28,44 +31,67 @@ function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    const pollStatus = async () => {
+      const { data, error } = await supabase
+        .from('status_app')
+        .select('status_app')
+        .eq('id_status_app', 1)
+        .single();
+
+      if (!error && data) {
+        switch (data.status_app) {
+          case 'ANTES':
+            setView('before');
+            break;
+          case 'DURANTE':
+            setView('vote');
+            break;
+          case 'DEPOIS':
+            setView('after');
+            break;
+          default:
+            setView('vote');
+        }
+      }
+    };
+
+    pollStatus();
+    const interval = setInterval(pollStatus, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
     setView('vote');
+    navigate('/');
   };
+
+  
+  if (view === 'before') {
+    return <BeforeView />;
+  }
+
+  if (view === 'after') {
+    return <AfterView />;
+  }
 
   return (
     <div className="min-h-screen p-4">
-      
       <div className="flex gap-4 mb-6">
-        <button
-          onClick={() => setView('vote')}
-          className="bg-blue-400 hover:bg-blue-500 text-white px-4 py-2 rounded-xl cursor-pointer transition-colors"
-        >
-          Vote
-        </button>
 
-        {!user && (
-          <button
-            onClick={() => setView('admin')}
-            className="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-xl cursor-pointer transition-colors"
-          >
-            Login
-          </button>
-        )}
-
-        
         {user && (
           <>
             <button
               onClick={() => navigate('/admin-dashboard')}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl cursor-pointer transition-colors"
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl shadow-xl cursor-pointer"
             >
               Admin Panel
             </button>
             <button
               onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl cursor-pointer transition-colors"
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl shadow-xl cursor-pointer"
             >
               Logout
             </button>
@@ -73,52 +99,10 @@ function Home() {
         )}
       </div>
 
-      {view === 'vote' ? (
-        <VoteCard />
-      ) : !user ? (
-        <LoginForm />
-      ) : null}
+      {view === 'vote' && <VoteCard />}
+      
     </div>
   );
-}
-
-function AdminDashboardPage() {
-  const [user, setUser] = useState(null);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) navigate('/');
-      else setUser(user);
-    };
-    checkUser();
-  }, [navigate]);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
-  };
-
-  return user ? (
-    <div className="min-h-screen p-4">
-      <div className="flex gap-4 mb-6">
-        <button
-          onClick={() => navigate('/')}
-          className="bg-blue-400 hover:bg-blue-500 text-white px-4 py-2 rounded-xl cursor-pointer transition-colors"
-        >
-          Back to Main
-        </button>
-        <button
-          onClick={handleLogout}
-          className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl cursor-pointer transition-colors"
-        >
-          Logout
-        </button>
-      </div>
-      <AdminPanel />
-    </div>
-  ) : null;
 }
 
 function App() {
@@ -127,7 +111,8 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
+          <Route path="/login" element={<LoginForm />} />
+          <Route path="/admin-dashboard" element={<AdminPanel />} />
         </Routes>
       </Router>
     </CookiesProvider>
