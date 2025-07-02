@@ -12,6 +12,15 @@ export default function VoteCard() {
   const [votingAllowed, setVotingAllowed] = useState(true);
   const timerRef = useRef(null);
 
+  const getImageUrl = (imageName) => {
+    try {
+      return new URL(`../assets/${imageName}`, import.meta.url).href;
+    } catch (err) {
+      console.error('Error loading image:', err);
+      return '/placeholder.png';
+    }
+  };
+
   const fetchData = async () => {
     const { data: activeData } = await supabase
       .from('active_project')
@@ -107,31 +116,37 @@ export default function VoteCard() {
   if (!project) return <div className="p-10 text-center text-gray-600">Loading...</div>;
 
   const status = project.status_projs?.status_projs;
-  const logoUrl = '/logo.png';
 
-  const renderPresenting = () => (
+  const renderPresenting = () => {
+  const imageUrl = project.img_url ? getImageUrl(project.img_url) : '/placeholder.png';
+  console.log('Image URL:', imageUrl); 
+
+  return (
     <div className="max-w-md mx-auto bg-white shadow-xl rounded-xl p-6 text-center space-y-4">
       <div className="flex justify-between items-center">
         <div className="text-left">
-          <p className="text-sm text-gray-500">#{project.id_projects}</p>
+          <p className="text-sm text-gray-500">#{project.number}</p>
           <h2 className="text-xl font-bold text-blue-800">{project.title}</h2>
           <p className="text-sm text-gray-700 whitespace-pre-line">{project.text}</p>
         </div>
         <img src={logo} alt="Logo" className="w-24 h-20 object-contain" />
       </div>
-      <img
-        src={project.image_url || '/placeholder.png'}
-        alt="Project"
-        className="w-full h-48 object-cover rounded-md"
-      />
 
+      <div className="relative overflow-hidden rounded-md group">
+        <img
+          src={imageUrl}
+          alt="Project"
+          className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-105 cursor-pointer"
+        />
+      </div>
     </div>
   );
+};
 
   const renderVoting = () => (
     <div className="max-w-md mx-auto bg-white shadow-xl rounded-xl p-6 text-center space-y-5">
       <div>
-        <p className="text-sm text-gray-500">#{project.id_projects}</p>
+        <p className="text-sm text-gray-500">#{project.number}</p>
         <h2 className="text-xl font-bold text-blue-800">{project.title}</h2>
       </div>
       {questions.map((q) => {
@@ -143,7 +158,7 @@ export default function VoteCard() {
               <button
                 onClick={() => handleOptionSelect(qid, 'Sim')}
                 disabled={hasVoted(qid) || !votingAllowed}
-                className={`px-4 py-2 rounded-full font-medium text-white ${
+                className={`px-4 py-2 rounded-full font-medium text-white cursor-pointer ${
                   selectedVotes[qid] === 'Sim'
                     ? 'bg-blue-700'
                     : hasVoted(qid)
@@ -156,7 +171,7 @@ export default function VoteCard() {
               <button
                 onClick={() => handleOptionSelect(qid, 'Nao')}
                 disabled={hasVoted(qid) || !votingAllowed}
-                className={`px-4 py-2 rounded-full font-medium text-white ${
+                className={`px-4 py-2 rounded-full font-medium text-white cursor-pointer ${
                   selectedVotes[qid] === 'Nao'
                     ? 'bg-blue-700'
                     : hasVoted(qid)
@@ -173,7 +188,7 @@ export default function VoteCard() {
       <button
         onClick={handleSubmitVotes}
         disabled={!votingAllowed || Object.keys(selectedVotes).length === 0}
-        className="mt-2 bg-blue-800 text-white font-bold px-6 py-2 rounded-lg disabled:bg-gray-400"
+        className="mt-2 bg-blue-800 text-white font-bold px-6 py-2 rounded-lg disabled:bg-gray-400 cursor-pointer"
       >
         SUBMETER VOTO
       </button>
@@ -184,31 +199,61 @@ export default function VoteCard() {
   );
 
   const renderVotingClosed = () => (
-    <div className="max-w-md mx-auto bg-white shadow-xl rounded-xl p-6 text-center space-y-5">
-      <div>
-        <p className="text-sm text-gray-500">#{project.number}</p>
-        <h2 className="text-xl font-bold text-blue-800">{project.title}</h2>
+  <div className="max-w-md mx-auto bg-white shadow-xl rounded-xl p-6 text-center space-y-5">
+    <div className="mb-4">
+      <p className="text-sm text-gray-500">#{project.number}</p>
+      <h2 className="text-xl font-bold text-blue-800 mb-2">{project.title}</h2>
+      <div className="bg-blue-50 text-blue-800 p-2 rounded-lg">
+        <p className="text-sm font-medium">Votação Encerrada</p>
       </div>
-      {questions.map((q) => {
-        const total = q.votes_a + q.votes_b;
-        const percentA = total ? Math.round((q.votes_a / total) * 100) : 0;
-        const percentB = 100 - percentA;
-        return (
-          <div key={q.ref_id_questions} className="space-y-1 text-left">
-            <p className="text-sm font-medium text-gray-800 italic">• {q.questions?.text}</p>
-            <div className="flex gap-2">
-              <div className="flex-1 bg-green-500 text-white text-center rounded-full py-1 font-semibold text-sm">
-                {percentA}%
+    </div>
+    
+    {questions.map((q) => {
+      const total = q.votes_a + q.votes_b;
+      const percentA = total ? Math.round((q.votes_a / total) * 100) : 0;
+      const percentB = 100 - percentA;
+      
+      return (
+        <div key={q.ref_id_questions} className="space-y-3 group">
+          <p className="text-sm font-medium text-gray-800 px-2">
+            {q.questions?.text}
+          </p>
+          
+          <div className="space-y-1">
+
+            <div className="flex h-6 bg-gray-200 rounded-full overflow-hidden">
+              <div 
+                className="bg-green-500 flex items-center justify-center text-xs font-bold text-white 
+                          transition-all duration-300 ease-out 
+                          group-hover:scale-y-125 group-hover:shadow-md origin-bottom cursor-pointer"
+                style={{ width: `${percentA}%` }}
+              >
+                <span className="transition-opacity duration-300 group-hover:opacity-100 opacity-90">
+                  {percentA}%
+                </span>
               </div>
-              <div className="flex-1 bg-red-500 text-white text-center rounded-full py-1 font-semibold text-sm">
-                {percentB}%
+              <div 
+                className="bg-red-500 flex items-center justify-center text-xs font-bold text-white 
+                          transition-all duration-300 ease-out 
+                          group-hover:scale-y-125 group-hover:shadow-md origin-bottom cursor-pointer"
+                style={{ width: `${percentB}%` }}
+              >
+                <span className="transition-opacity duration-300 group-hover:opacity-100 opacity-90">
+                  {percentB}%
+                </span>
               </div>
             </div>
+          
+            <div className="text-xs text-center text-gray-500 opacity-0
+            group-hover:opacity-100 transition-opacity duration-200">
+              Total: {total} votos
+            </div>
           </div>
-        );
-      })}
-    </div>
-  );
+        </div>
+      );
+    })}
+  </div>
+);
 
   return (
     <>

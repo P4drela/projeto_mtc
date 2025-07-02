@@ -1,4 +1,3 @@
-// App.jsx
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import VoteCard from './components/VoteCard';
